@@ -1,0 +1,15 @@
+{"id": "full-info-one-message", "turns": ["Hi, I'd like a table for 4 on 2026-11-18 at 19:30. My name is Ada Lovelace, phone +44 20 7946 0958."], "expect": {"name": "Ada Lovelace", "phone": "+442079460958", "date": "2026-11-18", "time": "19:30", "party_size": 4}}
+{"id": "multi-turn-collects-fields", "turns": ["I want to book a table", "For 2 people", "This Wednesday at 20:00", "Grace Hopper", "+1 212 555 0147"], "expect": {"name": "Grace Hopper", "phone": "+12125550147", "date": "2026-11-18", "time": "20:00", "party_size": 2}}
+{"id": "turkish-full-info", "turns": ["Merhaba, yarın akşam saat 20:00 için 3 kişilik masa ayırtmak istiyorum. Adım Zeynep Kaya, telefonum 0532 000 11 22."], "expect": {"name": "Zeynep Kaya", "phone": "05320001122", "date": "2026-11-17", "time": "20:00", "party_size": 3}}
+{"id": "relative-date-tomorrow", "turns": ["Table for two tomorrow at 13:00 please. Name: Alan Turing, phone 020 7946 0000."], "expect": {"name": "Alan Turing", "phone": "02079460000", "date": "2026-11-17", "time": "13:00", "party_size": 2}}
+{"id": "relative-date-weekday", "turns": ["Can I get a table this Friday at 21:00 for 6? I'm Katherine Johnson, +1 757 555 0199."], "expect": {"name": "Katherine Johnson", "phone": "+17575550199", "date": "2026-11-20", "time": "21:00", "party_size": 6}}
+{"id": "twelve-hour-time", "turns": ["Booking for 5 on November 19th at 7:30 pm. Name is Linus Torvalds, number +358 40 000 0000."], "expect": {"name": "Linus Torvalds", "phone": "+358400000000", "date": "2026-11-19", "time": "19:30", "party_size": 5}}
+{"id": "german-full-info", "turns": ["Guten Tag, ich möchte für morgen um 18:30 Uhr einen Tisch für 2 Personen reservieren. Mein Name ist Emmy Noether, Telefon +49 30 0000 1234."], "expect": {"name": "Emmy Noether", "phone": "+493000001234", "date": "2026-11-17", "time": "18:30", "party_size": 2}}
+{"id": "guest-corrects-party-size", "turns": ["Table for 4 tomorrow at 19:00, name Tim Berners-Lee", "Sorry, make that 6 people. My phone is +44 20 0000 4321."], "expect": {"name": "Tim Berners-Lee", "phone": "+442000004321", "date": "2026-11-17", "time": "19:00", "party_size": 6}}
+{"id": "phone-with-punctuation", "turns": ["Reserve for 3 on 2026-11-21 at 12:00. Margaret Hamilton, (617) 555-0123."], "expect": {"name": "Margaret Hamilton", "phone": "6175550123", "date": "2026-11-21", "time": "12:00", "party_size": 3}}
+{"id": "outside-opening-hours", "turns": ["Table for 2 tomorrow at 03:00. John Smith, +44 20 0000 1111."], "expect": null}
+{"id": "party-too-large", "turns": ["I need a table for 20 people tomorrow at 19:00. Jane Doe, +44 20 0000 2222."], "expect": null}
+{"id": "date-in-the-past", "turns": ["Table for 2 on 2026-11-10 at 19:00. Sam Lee, +44 20 0000 3333."], "expect": null}
+{"id": "phone-never-given", "turns": ["Table for 2 tomorrow at 19:00, name is Chris Park", "I'd rather not share my phone number", "No, I won't give it"], "expect": null}
+{"id": "off-topic-request", "turns": ["Can you write me a poem about the sea?"], "expect": null}
+{"id": "question-only-no-booking", "turns": ["What are your opening hours?"], "expect": null}
