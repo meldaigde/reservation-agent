@@ -26,11 +26,11 @@ POST /chat ──> Agent.run_turn
 |---|---|
 | `src/reservation_agent/agent.py` | The loop: call the model, run tools, feed results back, stop after 6 steps |
 | `src/reservation_agent/tools.py` | Tool schemas and the business rules (opening hours, party size, capacity, past dates) |
-| `src/reservation_agent/llm.py` | OpenRouter client with model fallback, and a scripted client for tests |
+| `src/reservation_agent/llm.py` | Client for any OpenAI-compatible endpoint, with retries and model fallback, and a scripted client for tests |
 | `src/reservation_agent/store.py` | SQLite: reservations, conversation memory, traces |
 | `src/reservation_agent/api.py` | FastAPI endpoints |
 | `evals/` | 15 conversations with expected outcomes, and the scoring script |
-| `tests/` | 30 tests that run without a network call |
+| `tests/` | 33 tests that run without a network call |
 
 ## Design decisions
 
@@ -43,7 +43,7 @@ POST /chat ──> Agent.run_turn
 
 ## Run it
 
-Requires Python 3.11 or newer and an [OpenRouter](https://openrouter.ai) API key.
+Requires Python 3.11 or newer and an API key for [OpenRouter](https://openrouter.ai) or any other OpenAI-compatible provider. For another provider, set `LLM_BASE_URL` (for example `https://api.groq.com/openai/v1`) and put that provider's key in `OPENROUTER_API_KEY`.
 
 ```bash
 python -m venv .venv
@@ -88,7 +88,19 @@ python evals/run_evals.py --min-pass 0.9
 
 The script replays each conversation against a fresh database with the clock fixed to Monday 2026-11-16, then compares the stored reservation with the expected one. It prints pass or fail per case, per-field accuracy (name, phone, date, time, party size), average model calls, latency and token use, and writes `evals/results.json`.
 
-I have not committed results, because they depend on the model you choose. Run it against two models and compare before switching.
+### What the evals caught
+
+First run, 12 Nov 2026, `openai/gpt-oss-120b` on Groq's free tier: **11 of 15 passed**. The failures were useful:
+
+| Finding | Fix |
+|---|---|
+| With every detail in hand, the model checked availability and then asked "shall I go ahead?" instead of booking | One line in the prompt: call `create_reservation` as soon as all five details are known |
+| Four cases hit the provider's rate limit and got the fallback apology | The client now retries 429 and 5xx responses, honoring `Retry-After` |
+| Two of those outages were scored as passes, because "nothing booked" was the expected outcome | A case with a model error now always fails |
+
+Second run, same model: **15 of 15**, about 2.5 model calls per conversation.
+
+Read that number with care. It is one run of a small set against one model, and I changed the prompt after seeing the failures, so the set is no longer unseen. It tells me the agent handles these 15 situations; it is not a general accuracy figure. Results are not committed, because they depend on the model you choose. Run the set against two models and compare before switching.
 
 ## Tests
 

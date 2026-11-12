@@ -25,6 +25,8 @@ def build_system_prompt(settings: Settings, now: datetime) -> str:
         f" Largest party you can book: {settings.max_party_size}.\n"
         "To book you need: full name, phone number, date, time and party size."
         " Ask only for what is still missing, one short question at a time.\n"
+        "As soon as you have all five, call create_reservation in the same turn."
+        " Do not ask the guest to confirm details they already gave.\n"
         "Never invent a detail the guest did not give. Never say a table is booked unless"
         " create_reservation returned ok=true.\n"
         "When a tool returns an error, explain it plainly and offer a way forward.\n"

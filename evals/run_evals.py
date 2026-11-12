@@ -57,9 +57,16 @@ def run_case(case: dict[str, Any], llm: OpenRouterClient, settings: Settings) ->
     reservations = store.list_reservations()
     traces = store.traces(case["id"])
     llm_traces = [trace for trace in traces if trace["kind"] == "llm"]
+    llm_errors = [trace["detail"].get("error", "") for trace in llm_traces if not trace["ok"]]
+    score = score_case(case["expect"], reservations)
+    if llm_errors:
+        # A model outage books nothing, which would look like a pass for the
+        # "nothing should be booked" cases. Count it as a failure instead.
+        score["passed"] = False
     return {
         "id": case["id"],
-        **score_case(case["expect"], reservations),
+        **score,
+        "llm_errors": llm_errors,
         "llm_calls": len(llm_traces),
         "tool_calls": len(traces) - len(llm_traces),
         "latency_ms": round(sum(trace["latency_ms"] for trace in llm_traces)),
@@ -104,6 +111,8 @@ def main() -> int:
         results.append(result)
         wrong = [field for field, ok in result["fields"].items() if not ok]
         note = f"  wrong: {', '.join(wrong)}" if wrong else ""
+        if result["llm_errors"]:
+            note = f"  model error: {result['llm_errors'][0][:120]}"
         print(f"{'PASS' if result['passed'] else 'FAIL'}  {result['id']:<30} {result['llm_calls']} llm calls{note}")
 
     summary = summarize(results)

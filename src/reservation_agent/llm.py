@@ -7,14 +7,24 @@ canned responses so the agent loop can be tested without a network call.
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from typing import Any, Callable, Protocol
 
 import httpx
 
 
 class LLMError(RuntimeError):
     pass
+
+
+def _retry_delay(reply: Any, attempt: int, max_wait: float) -> float:
+    """Honor Retry-After when the server sends it, otherwise back off 2s, 4s, 8s."""
+    try:
+        wait = float(reply.headers.get("retry-after", ""))
+    except (AttributeError, TypeError, ValueError):
+        wait = 2.0 * (2**attempt)
+    return max(0.0, min(wait, max_wait))
 
 
 @dataclass
@@ -39,7 +49,13 @@ class OpenRouterClient:
         base_url: str = "https://openrouter.ai/api/v1",
         timeout: float = 30.0,
         http: httpx.Client | None = None,
+        max_retries: int = 3,
+        max_retry_wait: float = 30.0,
+        sleep: Callable[[float], None] = time.sleep,
     ) -> None:
+        self.max_retries = max_retries
+        self.max_retry_wait = max_retry_wait
+        self.sleep = sleep
         if not api_key:
             raise LLMError("OPENROUTER_API_KEY is not set")
         if not model:
@@ -62,17 +78,21 @@ class OpenRouterClient:
         raise LLMError("All models failed. " + " | ".join(attempts))
 
     def _post(self, model: str, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> LLMResponse:
-        reply = self.http.post(
-            f"{self.base_url}/chat/completions",
-            headers=self.headers,
-            json={
-                "model": model,
-                "messages": messages,
-                "tools": tools,
-                "tool_choice": "auto",
-                "temperature": 0,
-            },
-        )
+        payload = {
+            "model": model,
+            "messages": messages,
+            "tools": tools,
+            "tool_choice": "auto",
+            "temperature": 0,
+        }
+        url = f"{self.base_url}/chat/completions"
+        reply = self.http.post(url, headers=self.headers, json=payload)
+        # Rate limits and server errors are usually gone a few seconds later.
+        for attempt in range(self.max_retries):
+            if reply.status_code != 429 and reply.status_code < 500:
+                break
+            self.sleep(_retry_delay(reply, attempt, self.max_retry_wait))
+            reply = self.http.post(url, headers=self.headers, json=payload)
         if reply.status_code >= 400:
             raise LLMError(f"HTTP {reply.status_code}: {reply.text[:200]}")
         data = reply.json()

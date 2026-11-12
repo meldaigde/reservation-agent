@@ -198,10 +198,11 @@ class FakeHTTP:
 
 
 class FakeReply:
-    def __init__(self, status_code: int, body: dict) -> None:
+    def __init__(self, status_code: int, body: dict, headers: dict | None = None) -> None:
         self.status_code = status_code
         self._body = body
         self.text = str(body)
+        self.headers = headers or {}
 
     def json(self) -> dict:
         return self._body
@@ -210,7 +211,7 @@ class FakeReply:
 def test_client_falls_back_to_second_model() -> None:
     ok_body = {"model": "backup", "choices": [{"message": say("hi")}], "usage": {"prompt_tokens": 5, "completion_tokens": 2}}
     http = FakeHTTP([FakeReply(500, {"error": "down"}), FakeReply(200, ok_body)])
-    client = OpenRouterClient("key", "primary", "backup", http=http)
+    client = OpenRouterClient("key", "primary", "backup", http=http, max_retries=0)
 
     response = client.complete([{"role": "user", "content": "hi"}], [])
 
@@ -219,9 +220,40 @@ def test_client_falls_back_to_second_model() -> None:
     assert response.attempts and response.attempts[0].startswith("primary: HTTP 500")
 
 
+def test_client_retries_rate_limit_on_same_model() -> None:
+    ok_body = {"choices": [{"message": say("hi")}]}
+    http = FakeHTTP(
+        [FakeReply(429, {}, {"retry-after": "7"}), FakeReply(503, {}), FakeReply(200, ok_body)]
+    )
+    waits: list[float] = []
+    client = OpenRouterClient("key", "primary", http=http, sleep=waits.append)
+
+    response = client.complete([{"role": "user", "content": "hi"}], [])
+
+    assert http.models == ["primary", "primary", "primary"]
+    assert waits == [7.0, 4.0]  # Retry-After first, then exponential backoff
+    assert response.message["content"] == "hi" and response.attempts == []
+
+
+def test_client_gives_up_after_max_retries() -> None:
+    http = FakeHTTP([FakeReply(429, {})] * 3)
+    client = OpenRouterClient("key", "primary", http=http, max_retries=2, sleep=lambda _: None)
+    with pytest.raises(LLMError, match="HTTP 429"):
+        client.complete([], [])
+    assert len(http.models) == 3
+
+
+def test_client_does_not_retry_client_errors() -> None:
+    http = FakeHTTP([FakeReply(401, {"error": "bad key"})])
+    client = OpenRouterClient("key", "primary", http=http, sleep=lambda _: None)
+    with pytest.raises(LLMError, match="HTTP 401"):
+        client.complete([], [])
+    assert len(http.models) == 1
+
+
 def test_client_raises_when_every_model_fails() -> None:
     http = FakeHTTP([FakeReply(500, {}), FakeReply(200, {"unexpected": True})])
-    client = OpenRouterClient("key", "primary", "backup", http=http)
+    client = OpenRouterClient("key", "primary", "backup", http=http, max_retries=0)
     with pytest.raises(LLMError, match="All models failed"):
         client.complete([], [])
 

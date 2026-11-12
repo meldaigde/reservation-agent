@@ -36,5 +36,5 @@ class Settings:
             api_key=env.get("OPENROUTER_API_KEY", ""),
             model=env.get("MODEL", ""),
             fallback_model=env.get("FALLBACK_MODEL", ""),
-            base_url=env.get("LLM_BASE_URL", cls.base_url),
+            base_url=env.get("LLM_BASE_URL") or cls.base_url,
         )
